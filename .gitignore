@@ -1,5 +1,6 @@
 credentials.json
 session.json
-token.pickle
+*.pickle
 pc_to_gsheets
 .DS_Store
+env
