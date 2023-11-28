@@ -28,38 +28,13 @@ SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 SPREADSHEET_ID = os.getenv('SPREADSHEET_ID')
 SUMMARY_SHEET_NAME = os.getenv('SUMMARY_SHEET_NAME') # 'wall_chart'
 TRANSACTIONS_SHEET_NAME = os.getenv('TRANSACTIONS_SHEET_NAME') # 'transactions'
+ACCOUNTS_SHEET_NAME = os.getenv('ACCOUNTS_SHEET_NAME') # 'accounts'
 SESSION_FILENAME = 'pc.pickle'
 
 TRANSACTIONS_START_DATE = '2013-04-01' # YYYY-MM-DD
 TRANSACTIONS_END_DATE = (datetime.now() - (timedelta(days=1))).strftime('%Y-%m-%d')
 
 #########################################
-
-
-# class PewCapital(PersonalCapital):
-# 	"""
-# 	Extends PersonalCapital to save and load session
-# 	So that it doesn't require 2-factor auth every time
-# 	"""
-# 	def __init__(self):
-# 		PersonalCapital.__init__(self)
-# 		self.__session_file = 'session.json'
-
-# 	# def load_session(self):
-# 	# 	try:
-# 	# 		with open(self.__session_file) as data_file:    
-# 	# 			cookies = {}
-# 	# 			try:
-# 	# 				cookies = json.load(data_file)
-# 	# 			except ValueError as err:
-# 	# 				logging.error(err)
-# 	# 			self.set_session(cookies)
-# 	# 	except IOError as err:
-# 	# 		logging.error(err)
-
-# 	# def save_session(self):
-# 	# 	with open(self.__session_file, 'w') as data_file:
-# 	# 		data_file.write(json.dumps(self.get_session()))
 
 def get_email():
 	email = os.getenv('PEW_EMAIL')
@@ -74,9 +49,26 @@ def get_password():
 		return getpass.getpass('Enter password:')
 	return password
 
+def convert_datetime(timestamp,format):
+	if isinstance(timestamp, (int, float)):
+		if len(str(timestamp)) == 13:
+			timestamp = timestamp/1000
+
+		if len(str(round(timestamp))) == 10:
+			# Convert to a datetime object
+			dt_object = datetime.utcfromtimestamp(timestamp)
+
+			# Format the datetime object as yyyy-mm-dd
+			if format == 'timestamp':
+				formatted_datetime = dt_object.strftime('%Y-%m-%d %H:%M:%S')
+			else:
+				formatted_datetime = dt_object.strftime('%Y-%m-%d')
+
+			return(formatted_datetime)
+	return(timestamp)
+	
 def import_pc_data():
 	email, password = get_email(), get_password()
-	# pc = PewCapital()
 	pc = PersonalCapital()
 	try:
 		pc.load_session(SESSION_FILENAME)
@@ -103,12 +95,19 @@ def import_pc_data():
 	})
 	pc.save_session(SESSION_FILENAME)
 	accounts = accounts_response.json()['spData']
+	total_accounts = len(accounts['accounts']) # count number of accounts
+	print(f'Number of accounts: {total_accounts}')
 	networth = accounts['networth']
 	print(f'Networth: {networth}')
 
 	transactions = transactions_response.json()['spData']
 	total_transactions = len(transactions['transactions'])
 	print(f'Number of transactions between {TRANSACTIONS_START_DATE} and {TRANSACTIONS_END_DATE}: {total_transactions}')
+
+	# with open('accounts.json', 'w') as data_file:
+	# 	data_file.write(json.dumps(accounts))
+	# with open('transactions.json', 'w') as data_file:
+	# 	data_file.write(json.dumps(transactions))
 
 	summary = {}
 
@@ -119,19 +118,41 @@ def import_pc_data():
 	transactions_output = []  # a list of dicts
 	for this_transaction in transactions['transactions']:
 		this_transaction_filtered = {
-			'date': this_transaction['transactionDate'],
-			'account': this_transaction['accountName'],
-			'description': this_transaction['description'],
-			'category': this_transaction['categoryId'],
-			'tags': '',
-			'amount': this_transaction['amount'], # always a positive int
-			'isIncome': this_transaction['isIncome'],
-			'isSpending': this_transaction['isSpending'],
-			'isCashIn': this_transaction['isCashIn'], # to determine whether `amount` should be positive or negative
+			'transactionId': this_transaction.get('userTransactionId'),
+			'date': this_transaction.get('transactionDate'),
+			'account': this_transaction.get('accountName'),
+			'description': this_transaction.get('description'),
+			'category': this_transaction.get('categoryId'),
+			'categoryDesc': this_transaction.get('categoryName'),
+			'tags': None,
+			'amount': this_transaction.get('amount'),  # always a positive int
+			'isIncome': this_transaction.get('isIncome'),
+			'isSpending': this_transaction.get('isSpending'),
+			'isCredit': this_transaction.get('isCredit'),  # to determine whether `amount` should be positive or negative
+			'status': this_transaction.get('status'),
 		}
 		transactions_output.append(this_transaction_filtered)
 
-	out = [summary, transactions_output]
+	accounts_output = []  # a list of dicts
+	for this_account in accounts['accounts']:
+		this_account_filtered = {
+			'accountId': this_account.get('userAccountId'),
+			'originalFirmName': this_account.get('originalFirmName'), 
+			'firmName': this_account.get('firmName'),
+			'originalName': this_account.get('originalName'),
+			'accountName': this_account.get('name'),
+			'productType': this_account.get('productType'),
+			'balance': this_account.get('balance'), # always a positive int
+			'createdDate': convert_datetime(this_account.get('createdDate'),'date'), # needs conversion
+			'lastRefreshed': convert_datetime(this_account.get('lastRefreshed'),'timestamp'), # needs conversion
+			'oldestTransactionDate': this_account.get('oldestTransactionDate'),
+			'closedDate': this_account.get('closedDate'),
+			'isAsset': this_account.get('isAsset'),
+			'isLiability': this_account.get('isLiability'),
+		}
+		accounts_output.append(this_account_filtered)
+
+	out = [summary, transactions_output, accounts_output]
 	return out
 
 def reshape_transactions(transactions):
@@ -166,12 +187,16 @@ def main():
 	pc_data = import_pc_data()
 	summary_data = pc_data[0]
 	transaction_data = pc_data[1]
+	account_data = pc_data[2]
 	
 	networth = summary_data['networth']
 	investments = summary_data['investmentAccountsTotal']
 
 	# reshape transaction data
 	eventual_output = reshape_transactions(transaction_data)
+
+	# reshape account data
+	eventual_output_accounts = reshape_transactions(account_data)
 
 	# read sheet to make sure we have data
 	sheet = service.spreadsheets()
@@ -229,7 +254,7 @@ def main():
 
 
 		# upload transactions data
-		transactions_range = '!A2:I'
+		transactions_range = '!A2:L'
 		transactions_sheet_range = TRANSACTIONS_SHEET_NAME + transactions_range
 
 		print("uploading transactions...")
@@ -242,6 +267,20 @@ def main():
 			valueInputOption='USER_ENTERED', body=transactions_body).execute()
 		print(result)
 
+		# upload accounts data
+		accounts_range = '!A2:M'
+		accounts_sheet_range = ACCOUNTS_SHEET_NAME + accounts_range
+
+		print("uploading accounts...")
+		accounts_body = {
+			"values": eventual_output_accounts,
+			"majorDimension": "ROWS"
+		}
+		result = service.spreadsheets().values().update(
+			spreadsheetId=SPREADSHEET_ID, range=accounts_sheet_range,
+			valueInputOption='USER_ENTERED', body=accounts_body).execute()
+		print(result)
+		
 		output = ""
 		if result:
 			output = "Success!"
