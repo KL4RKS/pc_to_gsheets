@@ -26,39 +26,40 @@ SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 # For info on these variables: 
 # https://developers.google.com/sheets/api/guides/concepts
 SPREADSHEET_ID = os.getenv('SPREADSHEET_ID')
-SUMMARY_SHEET_NAME = 'wall_chart'
-TRANSACTIONS_SHEET_NAME = 'transactions'
+SUMMARY_SHEET_NAME = os.getenv('SUMMARY_SHEET_NAME') # 'wall_chart'
+TRANSACTIONS_SHEET_NAME = os.getenv('TRANSACTIONS_SHEET_NAME') # 'transactions'
+SESSION_FILENAME = 'pc.pickle'
 
-TRANSACTIONS_START_DATE = '2019-04-01' # YYYY-MM-DD
+TRANSACTIONS_START_DATE = '2013-04-01' # YYYY-MM-DD
 TRANSACTIONS_END_DATE = (datetime.now() - (timedelta(days=1))).strftime('%Y-%m-%d')
 
 #########################################
 
 
-class PewCapital(PersonalCapital):
-	"""
-	Extends PersonalCapital to save and load session
-	So that it doesn't require 2-factor auth every time
-	"""
-	def __init__(self):
-		PersonalCapital.__init__(self)
-		self.__session_file = 'session.json'
+# class PewCapital(PersonalCapital):
+# 	"""
+# 	Extends PersonalCapital to save and load session
+# 	So that it doesn't require 2-factor auth every time
+# 	"""
+# 	def __init__(self):
+# 		PersonalCapital.__init__(self)
+# 		self.__session_file = 'session.json'
 
-	def load_session(self):
-		try:
-			with open(self.__session_file) as data_file:    
-				cookies = {}
-				try:
-					cookies = json.load(data_file)
-				except ValueError as err:
-					logging.error(err)
-				self.set_session(cookies)
-		except IOError as err:
-			logging.error(err)
+# 	# def load_session(self):
+# 	# 	try:
+# 	# 		with open(self.__session_file) as data_file:    
+# 	# 			cookies = {}
+# 	# 			try:
+# 	# 				cookies = json.load(data_file)
+# 	# 			except ValueError as err:
+# 	# 				logging.error(err)
+# 	# 			self.set_session(cookies)
+# 	# 	except IOError as err:
+# 	# 		logging.error(err)
 
-	def save_session(self):
-		with open(self.__session_file, 'w') as data_file:
-			data_file.write(json.dumps(self.get_session()))
+# 	# def save_session(self):
+# 	# 	with open(self.__session_file, 'w') as data_file:
+# 	# 		data_file.write(json.dumps(self.get_session()))
 
 def get_email():
 	email = os.getenv('PEW_EMAIL')
@@ -75,8 +76,12 @@ def get_password():
 
 def import_pc_data():
 	email, password = get_email(), get_password()
-	pc = PewCapital()
-	pc.load_session()
+	# pc = PewCapital()
+	pc = PersonalCapital()
+	try:
+		pc.load_session(SESSION_FILENAME)
+	except:
+		print('Unable to load session. Session file not found: ' + SESSION_FILENAME)
 
 	try:
 		pc.login(email, password)
@@ -96,7 +101,7 @@ def import_pc_data():
 		'endDate': TRANSACTIONS_END_DATE,
 		'component': 'DATAGRID'
 	})
-	pc.save_session()
+	pc.save_session(SESSION_FILENAME)
 	accounts = accounts_response.json()['spData']
 	networth = accounts['networth']
 	print(f'Networth: {networth}')
