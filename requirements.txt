@@ -12,7 +12,7 @@ idna==2.10
 numpy==1.19.1
 oauthlib==3.1.0
 pandas==1.1.1
-personalcapital==1.0.1
+personalcapital @ git+https://github.com/KL4RKS/personalcapital.git
 protobuf==3.13.0
 pyasn1==0.4.8
 pyasn1-modules==0.2.8
