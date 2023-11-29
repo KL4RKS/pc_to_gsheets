@@ -32,7 +32,8 @@ ACCOUNTS_SHEET_NAME = os.getenv('ACCOUNTS_SHEET_NAME') # 'accounts'
 SESSION_FILENAME = 'pc.pickle'
 
 TRANSACTIONS_START_DATE = '2013-04-01' # YYYY-MM-DD
-TRANSACTIONS_END_DATE = (datetime.now() - (timedelta(days=1))).strftime('%Y-%m-%d')
+# TRANSACTIONS_END_DATE = (datetime.now() - (timedelta(days=1))).strftime('%Y-%m-%d')
+TRANSACTIONS_END_DATE = datetime.now().strftime('%Y-%m-%d')
 
 #########################################
 
@@ -104,10 +105,10 @@ def import_pc_data():
 	total_transactions = len(transactions['transactions'])
 	print(f'Number of transactions between {TRANSACTIONS_START_DATE} and {TRANSACTIONS_END_DATE}: {total_transactions}')
 
-	# with open('accounts.json', 'w') as data_file:
-	# 	data_file.write(json.dumps(accounts))
-	# with open('transactions.json', 'w') as data_file:
-	# 	data_file.write(json.dumps(transactions))
+	with open('accounts.json', 'w') as data_file:
+		data_file.write(json.dumps(accounts))
+	with open('transactions.json', 'w') as data_file:
+		data_file.write(json.dumps(transactions))
 
 	summary = {}
 
@@ -118,18 +119,18 @@ def import_pc_data():
 	transactions_output = []  # a list of dicts
 	for this_transaction in transactions['transactions']:
 		this_transaction_filtered = {
-			'transactionId': this_transaction.get('userTransactionId'),
-			'date': this_transaction.get('transactionDate'),
-			'account': this_transaction.get('accountName'),
-			'description': this_transaction.get('description'),
-			'category': this_transaction.get('categoryId'),
-			'categoryDesc': this_transaction.get('categoryName'),
-			'tags': None,
-			'amount': this_transaction.get('amount'),  # always a positive int
-			'isIncome': this_transaction.get('isIncome'),
-			'isSpending': this_transaction.get('isSpending'),
-			'isCredit': this_transaction.get('isCredit'),  # to determine whether `amount` should be positive or negative
-			'status': this_transaction.get('status'),
+			'transactionId': this_transaction.get('userTransactionId', ''),
+			'date': this_transaction.get('transactionDate', ''),
+			'account': this_transaction.get('accountName', ''),
+			'description': this_transaction.get('description', ''),
+			'category': this_transaction.get('categoryId', ''),
+			'categoryDesc': this_transaction.get('categoryName', ''),
+			'tags': '',
+			'amount': this_transaction.get('amount', ''),  # always a positive int
+			'isIncome': this_transaction.get('isIncome', ''),
+			'isSpending': this_transaction.get('isSpending', ''),
+			'isCredit': this_transaction.get('isCredit', ''),  # to determine whether `amount` should be positive or negative
+			'status': this_transaction.get('status', ''),
 		}
 		transactions_output.append(this_transaction_filtered)
 
